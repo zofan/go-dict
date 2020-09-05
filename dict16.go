@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math"
+	"strings"
 	"sync"
 )
 
@@ -55,12 +56,46 @@ func (d *Dict16) GetID(key string) uint16 {
 	return id
 }
 
+func (d *Dict16) GetIDs(keys []string) []uint16 {
+	ids := make([]uint16, len(keys))
+
+	for i, key := range keys {
+		ids[i] = d.GetID(key)
+	}
+
+	return ids
+}
+
 func (d *Dict16) GetKey(id uint16) (string, bool) {
 	d.mu.Lock()
 	key, ok := d.rev[id]
 	d.mu.Unlock()
 
 	return key, ok
+}
+
+func (d *Dict16) GetKeys(ids []uint16) []string {
+	keys := make([]string, len(ids))
+
+	for i, id := range ids {
+		if key, ok := d.GetKey(id); ok {
+			keys[i] = key
+		}
+	}
+
+	return keys
+}
+
+func (d *Dict16) GetPrefix(prefix string) map[string]uint16 {
+	result := make(map[string]uint16)
+
+	for key, id := range d.dict {
+		if strings.HasPrefix(key, prefix) {
+			result[key] = id
+		}
+	}
+
+	return result
 }
 
 func (d *Dict16) Unmarshal(raw []byte) {
