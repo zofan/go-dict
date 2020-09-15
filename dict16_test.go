@@ -27,10 +27,10 @@ func TestA(t *testing.T) {
 		t.Error(`expected key1 equal "hello world!"`)
 	}
 
-	raw := d.Marshal()
+	raw, _ := d.MarshalBinary()
 
 	d2 := New()
-	d2.Unmarshal(raw)
+	_ = d2.UnmarshalBinary(raw)
 
 	id5 := d2.GetID(`good bye!`)
 	if id5 != id3 {

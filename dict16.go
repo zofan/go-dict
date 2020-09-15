@@ -26,7 +26,7 @@ type Dict16 struct {
 
 	lastID uint16
 
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 func New() *Dict16 {
@@ -67,9 +67,9 @@ func (d *Dict16) GetIDs(keys []string) []uint16 {
 }
 
 func (d *Dict16) GetKey(id uint16) (string, bool) {
-	d.mu.Lock()
+	d.mu.RLock()
 	key, ok := d.rev[id]
-	d.mu.Unlock()
+	d.mu.RUnlock()
 
 	return key, ok
 }
@@ -89,11 +89,15 @@ func (d *Dict16) GetKeys(ids []uint16) []string {
 func (d *Dict16) GetPrefix(prefix string) map[string]uint16 {
 	result := make(map[string]uint16)
 
+	d.mu.RLock()
+
 	for key, id := range d.dict {
 		if strings.HasPrefix(key, prefix) {
 			result[key] = id
 		}
 	}
+
+	d.mu.RUnlock()
 
 	return result
 }
@@ -124,7 +128,7 @@ func (d *Dict16) RenameKey(oldKey, newKey string) {
 	d.mu.Unlock()
 }
 
-func (d *Dict16) Unmarshal(raw []byte) {
+func (d *Dict16) UnmarshalBinary(raw []byte) error {
 	d.mu.Lock()
 
 	d.lastID = binary.BigEndian.Uint16(raw[0:])
@@ -149,10 +153,12 @@ func (d *Dict16) Unmarshal(raw []byte) {
 	}
 
 	d.mu.Unlock()
+
+	return nil
 }
 
-func (d *Dict16) Marshal() []byte {
-	d.mu.Lock()
+func (d *Dict16) MarshalBinary() ([]byte, error) {
+	d.mu.RLock()
 
 	raw := make([]byte, maxRawSize*len(d.dict))
 
@@ -173,7 +179,7 @@ func (d *Dict16) Marshal() []byte {
 		offset += 1
 	}
 
-	d.mu.Unlock()
+	d.mu.RUnlock()
 
-	return raw[:offset]
+	return raw[:offset], nil
 }
