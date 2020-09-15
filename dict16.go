@@ -98,6 +98,32 @@ func (d *Dict16) GetPrefix(prefix string) map[string]uint16 {
 	return result
 }
 
+func (d *Dict16) RenameID(id uint16, newKey string) {
+	d.mu.Lock()
+
+	if key, ok := d.rev[id]; ok {
+		delete(d.dict, key)
+
+		d.rev[id] = newKey
+		d.dict[newKey] = id
+	}
+
+	d.mu.Unlock()
+}
+
+func (d *Dict16) RenameKey(oldKey, newKey string) {
+	d.mu.Lock()
+
+	if id, ok := d.dict[oldKey]; ok {
+		delete(d.dict, oldKey)
+
+		d.rev[id] = newKey
+		d.dict[newKey] = id
+	}
+
+	d.mu.Unlock()
+}
+
 func (d *Dict16) Unmarshal(raw []byte) {
 	d.mu.Lock()
 
