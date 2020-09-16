@@ -3,6 +3,8 @@ package dict16
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"hash/crc32"
 	"math"
 	"strings"
 	"sync"
@@ -12,12 +14,17 @@ const (
 	byteRS = 0x1E
 
 	idSize     = 16 / 8
+	crcSize    = 4
 	minRawSize = idSize + MinKeyLen + 1
 	maxRawSize = idSize + MaxKeyLen + 1
 
 	MinKeyLen = 1
 	MaxKeyLen = 128
 	MaxSize   = math.MaxUint16 * maxRawSize
+)
+
+var (
+	ErrCorrupt = errors.New(`dict16: raw data is corrupt`)
 )
 
 type Dict16 struct {
@@ -38,6 +45,13 @@ func New() *Dict16 {
 
 func (d *Dict16) Count() int {
 	return len(d.dict)
+}
+
+func (d *Dict16) GetAll() map[uint16]string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.rev
 }
 
 func (d *Dict16) GetID(key string) uint16 {
@@ -77,11 +91,15 @@ func (d *Dict16) GetKey(id uint16) (string, bool) {
 func (d *Dict16) GetKeys(ids []uint16) []string {
 	keys := make([]string, len(ids))
 
+	d.mu.RLock()
+
 	for i, id := range ids {
-		if key, ok := d.GetKey(id); ok {
+		if key, ok := d.rev[id]; ok {
 			keys[i] = key
 		}
 	}
+
+	d.mu.RUnlock()
 
 	return keys
 }
@@ -130,41 +148,46 @@ func (d *Dict16) RenameKey(oldKey, newKey string) {
 
 func (d *Dict16) UnmarshalBinary(raw []byte) error {
 	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	d.lastID = binary.BigEndian.Uint16(raw[0:])
-	raw = raw[idSize:]
+	sum := binary.BigEndian.Uint32(raw[0:])
+	if sum != crc32.ChecksumIEEE(raw[crcSize:]) {
+		return ErrCorrupt
+	}
+
+	d.lastID = binary.BigEndian.Uint16(raw[crcSize:])
+	raw = raw[idSize+crcSize:]
 
 	for len(raw) > minRawSize {
 		id := binary.BigEndian.Uint16(raw[0:])
 		if id == 0 {
-			break
+			return ErrCorrupt
 		}
 
 		ke := bytes.IndexByte(raw, byteRS)
-		if ke < 1 || len(raw[idSize:ke]) == 0 {
-			break
+		if ke < 0 {
+			return ErrCorrupt
 		}
-		key := raw[idSize:ke]
+		key := string(raw[idSize:ke])
 
 		raw = raw[ke+1:]
 
-		d.dict[string(key)] = id
-		d.rev[id] = string(key)
+		d.dict[key] = id
+		d.rev[id] = key
 	}
-
-	d.mu.Unlock()
 
 	return nil
 }
 
 func (d *Dict16) MarshalBinary() ([]byte, error) {
 	d.mu.RLock()
+	defer d.mu.RUnlock()
 
 	raw := make([]byte, maxRawSize*len(d.dict))
 
-	binary.BigEndian.PutUint16(raw[0:], d.lastID)
+	binary.BigEndian.PutUint16(raw[crcSize:], d.lastID)
 
-	offset := idSize
+	offset := idSize + crcSize
 	for key, id := range d.dict {
 		binary.BigEndian.PutUint16(raw[offset:], id)
 		offset += idSize
@@ -179,7 +202,7 @@ func (d *Dict16) MarshalBinary() ([]byte, error) {
 		offset += 1
 	}
 
-	d.mu.RUnlock()
+	binary.BigEndian.PutUint32(raw[0:], crc32.ChecksumIEEE(raw[crcSize:offset]))
 
 	return raw[:offset], nil
 }
