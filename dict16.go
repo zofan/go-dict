@@ -13,7 +13,7 @@ import (
 const (
 	byteRS = 0x1E
 
-	idSize     = 16 / 8
+	idSize     = 2
 	crcSize    = 4
 	minRawSize = idSize + MinKeyLen + 1
 	maxRawSize = idSize + MaxKeyLen + 1
