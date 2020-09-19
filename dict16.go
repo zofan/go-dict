@@ -146,6 +146,7 @@ func (d *Dict16) RenameKey(oldKey, newKey string) {
 	d.mu.Unlock()
 }
 
+// implement interface: BinaryUnmarshaler
 func (d *Dict16) UnmarshalBinary(raw []byte) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -179,6 +180,7 @@ func (d *Dict16) UnmarshalBinary(raw []byte) error {
 	return nil
 }
 
+// implement interface: BinaryMarshaler
 func (d *Dict16) MarshalBinary() ([]byte, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
