@@ -10,41 +10,44 @@ import (
 )
 
 const (
-	idSize16     = 16 / 8
-	minRawSize16 = idSize16 + MinKeyLen + 1
-	maxRawSize16 = idSize16 + MaxKeyLen + 1
+	idSize8     = 1
+	minRawSize8 = idSize8 + MinKeyLen + 1
+	maxRawSize8 = idSize8 + MaxKeyLen + 1
 
-	MaxSize16 = math.MaxUint16 * maxRawSize16
+	MaxSize8 = math.MaxUint8 * maxRawSize8
 )
 
-type Dict16 struct {
-	dict map[string]uint16
-	rev  map[uint16]string
+type Dict8 struct {
+	dict map[string]uint8
+	rev  map[uint8]string
 
-	lastID uint16
+	lastID uint8
 
 	mu sync.RWMutex
 }
 
-func New16() *Dict16 {
-	return &Dict16{
-		dict: make(map[string]uint16),
-		rev:  make(map[uint16]string),
+func New8() *Dict8 {
+	return &Dict8{
+		dict: make(map[string]uint8),
+		rev:  make(map[uint8]string),
 	}
 }
 
-func (d *Dict16) Count() int {
+func (d *Dict8) Count() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
 	return len(d.dict)
 }
 
-func (d *Dict16) GetAll() map[uint16]string {
+func (d *Dict8) GetAll() map[uint8]string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
 	return d.rev
 }
 
-func (d *Dict16) GetID(key string) uint16 {
+func (d *Dict8) GetID(key string) uint8 {
 	d.mu.Lock()
 
 	id, ok := d.dict[key]
@@ -60,8 +63,8 @@ func (d *Dict16) GetID(key string) uint16 {
 	return id
 }
 
-func (d *Dict16) GetIDs(keys []string) []uint16 {
-	ids := make([]uint16, len(keys))
+func (d *Dict8) GetIDs(keys []string) []uint8 {
+	ids := make([]uint8, len(keys))
 
 	for i, key := range keys {
 		ids[i] = d.GetID(key)
@@ -70,7 +73,7 @@ func (d *Dict16) GetIDs(keys []string) []uint16 {
 	return ids
 }
 
-func (d *Dict16) GetKey(id uint16) (string, bool) {
+func (d *Dict8) GetKey(id uint8) (string, bool) {
 	d.mu.RLock()
 	key, ok := d.rev[id]
 	d.mu.RUnlock()
@@ -78,7 +81,7 @@ func (d *Dict16) GetKey(id uint16) (string, bool) {
 	return key, ok
 }
 
-func (d *Dict16) GetKeys(ids []uint16) []string {
+func (d *Dict8) GetKeys(ids []uint8) []string {
 	keys := make([]string, len(ids))
 
 	d.mu.RLock()
@@ -94,8 +97,8 @@ func (d *Dict16) GetKeys(ids []uint16) []string {
 	return keys
 }
 
-func (d *Dict16) GetPrefix(prefix string) map[string]uint16 {
-	result := make(map[string]uint16)
+func (d *Dict8) GetPrefix(prefix string) map[string]uint8 {
+	result := make(map[string]uint8)
 
 	d.mu.RLock()
 
@@ -110,7 +113,7 @@ func (d *Dict16) GetPrefix(prefix string) map[string]uint16 {
 	return result
 }
 
-func (d *Dict16) RenameID(id uint16, newKey string) {
+func (d *Dict8) RenameID(id uint8, newKey string) {
 	d.mu.Lock()
 
 	if key, ok := d.rev[id]; ok {
@@ -123,7 +126,7 @@ func (d *Dict16) RenameID(id uint16, newKey string) {
 	d.mu.Unlock()
 }
 
-func (d *Dict16) RenameKey(oldKey, newKey string) {
+func (d *Dict8) RenameKey(oldKey, newKey string) {
 	d.mu.Lock()
 
 	if id, ok := d.dict[oldKey]; ok {
@@ -137,7 +140,7 @@ func (d *Dict16) RenameKey(oldKey, newKey string) {
 }
 
 // implement interface: BinaryUnmarshaler
-func (d *Dict16) UnmarshalBinary(raw []byte) error {
+func (d *Dict8) UnmarshalBinary(raw []byte) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -146,11 +149,11 @@ func (d *Dict16) UnmarshalBinary(raw []byte) error {
 		return ErrCorrupt
 	}
 
-	d.lastID = binary.BigEndian.Uint16(raw[crcSize:])
-	raw = raw[idSize16+crcSize:]
+	d.lastID = uint8(raw[crcSize])
+	raw = raw[idSize8+crcSize:]
 
-	for len(raw) > minRawSize16 {
-		id := binary.BigEndian.Uint16(raw[0:])
+	for len(raw) > minRawSize8 {
+		id := uint8(raw[0])
 		if id == 0 {
 			return ErrCorrupt
 		}
@@ -159,7 +162,7 @@ func (d *Dict16) UnmarshalBinary(raw []byte) error {
 		if ke < 0 {
 			return ErrCorrupt
 		}
-		key := string(raw[idSize16:ke])
+		key := string(raw[idSize8:ke])
 
 		raw = raw[ke+1:]
 
@@ -171,18 +174,18 @@ func (d *Dict16) UnmarshalBinary(raw []byte) error {
 }
 
 // implement interface: BinaryMarshaler
-func (d *Dict16) MarshalBinary() ([]byte, error) {
+func (d *Dict8) MarshalBinary() ([]byte, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	raw := make([]byte, maxRawSize16*len(d.dict))
+	raw := make([]byte, maxRawSize8*len(d.dict))
 
-	binary.BigEndian.PutUint16(raw[crcSize:], d.lastID)
+	raw[crcSize] = d.lastID
 
-	offset := idSize16 + crcSize
+	offset := idSize8 + crcSize
 	for key, id := range d.dict {
-		binary.BigEndian.PutUint16(raw[offset:], id)
-		offset += idSize16
+		raw[offset] = id
+		offset += idSize8
 
 		for i, c := range key {
 			raw[offset+i] = byte(c)

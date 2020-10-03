@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func Test16(t *testing.T) {
-	d := New16()
+func Test8(t *testing.T) {
+	d := New8()
 
 	id1 := d.GetID(`hello world!`)
 	if id1 == 0 {
@@ -29,7 +29,7 @@ func Test16(t *testing.T) {
 
 	raw, _ := d.MarshalBinary()
 
-	d2 := New16()
+	d2 := New8()
 	_ = d2.UnmarshalBinary(raw)
 
 	id5 := d2.GetID(`good bye!`)
