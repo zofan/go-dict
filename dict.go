@@ -7,7 +7,7 @@ import (
 const (
 	byteRS = 0x1E
 
-	crcSize    = 4
+	crcSize = 4
 
 	MinKeyLen = 1
 	MaxKeyLen = 128
