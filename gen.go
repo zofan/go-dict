@@ -4,6 +4,8 @@ package main
 
 import (
 	"io/ioutil"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -27,12 +29,18 @@ var (
 )
 
 func main() {
-	genCode()
-	genTest()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		panic(`can't get path`)
+	}
+	path := filepath.Dir(file) + `/`
+
+	genCode(path)
+	genTest(path)
 }
 
-func genCode() {
-	raw, err := ioutil.ReadFile(`dict16.go`)
+func genCode(path string) {
+	raw, err := ioutil.ReadFile(path + `dict16.go`)
 	if err != nil {
 		panic(err)
 	}
@@ -41,14 +49,14 @@ func genCode() {
 
 	code = replacer.Replace(code)
 
-	err = ioutil.WriteFile(`dict8.go`, []byte(code), 0666)
+	err = ioutil.WriteFile(path + `dict8.go`, []byte(code), 0664)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func genTest() {
-	raw, err := ioutil.ReadFile(`dict16_test.go`)
+func genTest(path string) {
+	raw, err := ioutil.ReadFile(path + `dict16_test.go`)
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +65,7 @@ func genTest() {
 
 	code = replacer.Replace(code)
 
-	err = ioutil.WriteFile(`dict8_test.go`, []byte(code), 0666)
+	err = ioutil.WriteFile(path + `dict8_test.go`, []byte(code), 0664)
 	if err != nil {
 		panic(err)
 	}

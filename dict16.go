@@ -34,10 +34,13 @@ func New16() *Dict16 {
 }
 
 func (d *Dict16) Count() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
 	return len(d.dict)
 }
 
-func (d *Dict16) GetAll() map[uint16]string {
+func (d *Dict16) All() map[uint16]string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -155,11 +158,12 @@ func (d *Dict16) UnmarshalBinary(raw []byte) error {
 			return ErrCorrupt
 		}
 
+		raw = raw[idSize16:]
 		ke := bytes.IndexByte(raw, byteRS)
 		if ke < 0 {
 			return ErrCorrupt
 		}
-		key := string(raw[idSize16:ke])
+		key := string(raw[:ke])
 
 		raw = raw[ke+1:]
 

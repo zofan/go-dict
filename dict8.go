@@ -40,7 +40,7 @@ func (d *Dict8) Count() int {
 	return len(d.dict)
 }
 
-func (d *Dict8) GetAll() map[uint8]string {
+func (d *Dict8) All() map[uint8]string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -158,11 +158,12 @@ func (d *Dict8) UnmarshalBinary(raw []byte) error {
 			return ErrCorrupt
 		}
 
+		raw = raw[idSize8:]
 		ke := bytes.IndexByte(raw, byteRS)
 		if ke < 0 {
 			return ErrCorrupt
 		}
-		key := string(raw[idSize8:ke])
+		key := string(raw[:ke])
 
 		raw = raw[ke+1:]
 
