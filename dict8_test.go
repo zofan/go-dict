@@ -1,6 +1,7 @@
 package dict
 
 import (
+	"os"
 	"testing"
 )
 
@@ -65,5 +66,20 @@ func Test8(t *testing.T) {
 	id22 = d2.GetID(`new_key2`)
 	if id2 != id22 {
 		t.Error(`expected id2 equal id22`)
+	}
+
+	file := os.TempDir() + `/go-dict16-test.dat`
+
+	if err := d2.SaveFile(file); err != nil {
+		t.Error(err)
+	}
+
+	if err := d2.LoadFile(file); err != nil {
+		t.Error(err)
+	}
+
+	key2, ok = d2.GetKey(id5)
+	if key2 != `good bye!` {
+		t.Error(`expected key2 equal "good bye!"`)
 	}
 }

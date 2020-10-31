@@ -3,8 +3,9 @@ package dict
 import (
 	"bytes"
 	"encoding/binary"
-	"hash/crc32"
+	"io"
 	"math"
+	"os"
 	"strings"
 	"sync"
 )
@@ -144,16 +145,11 @@ func (d *Dict16) UnmarshalBinary(raw []byte) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	sum := binary.BigEndian.Uint32(raw[0:])
-	if sum != crc32.ChecksumIEEE(raw[crcSize:]) {
-		return ErrCorrupt
-	}
-
-	d.lastID = binary.BigEndian.Uint16(raw[crcSize:])
-	raw = raw[idSize16+crcSize:]
+	d.lastID = binary.BigEndian.Uint16(raw)
+	raw = raw[idSize16:]
 
 	for len(raw) > minRawSize16 {
-		id := binary.BigEndian.Uint16(raw[0:])
+		id := binary.BigEndian.Uint16(raw)
 		if id == 0 {
 			return ErrCorrupt
 		}
@@ -181,9 +177,9 @@ func (d *Dict16) MarshalBinary() ([]byte, error) {
 
 	raw := make([]byte, maxRawSize16*len(d.dict))
 
-	binary.BigEndian.PutUint16(raw[crcSize:], d.lastID)
+	binary.BigEndian.PutUint16(raw, d.lastID)
 
-	offset := idSize16 + crcSize
+	offset := idSize16
 	for key, id := range d.dict {
 		binary.BigEndian.PutUint16(raw[offset:], id)
 		offset += idSize16
@@ -198,7 +194,97 @@ func (d *Dict16) MarshalBinary() ([]byte, error) {
 		offset += 1
 	}
 
-	binary.BigEndian.PutUint32(raw[0:], crc32.ChecksumIEEE(raw[crcSize:offset]))
-
 	return raw[:offset], nil
+}
+
+func (d *Dict16) LoadFile(file string) error {
+	fh, err := os.OpenFile(file, os.O_CREATE|os.O_RDONLY, 0664)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	raw := make([]byte, idSize16)
+	_, err = fh.ReadAt(raw, 0)
+	if err != nil {
+		return err
+	}
+	d.lastID = binary.BigEndian.Uint16(raw)
+
+	var offset int64 = idSize16
+	for {
+		raw := make([]byte, maxRawSize16)
+		_, err = fh.ReadAt(raw, offset)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		id := binary.BigEndian.Uint16(raw)
+		if id == 0 {
+			return ErrCorrupt
+		}
+
+		raw = raw[idSize16:]
+		ke := bytes.IndexByte(raw, byteRS)
+		if ke < 0 {
+			return ErrCorrupt
+		}
+		key := string(raw[:ke])
+
+		raw = raw[ke+1:]
+
+		d.dict[key] = id
+		d.rev[id] = key
+
+		offset += idSize16 + 1 + int64(len(key))
+	}
+
+	return nil
+}
+
+func (d *Dict16) SaveFile(file string) error {
+	fh, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0664)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	raw := make([]byte, idSize16)
+	binary.BigEndian.PutUint16(raw, d.lastID)
+	_, err = fh.Write(raw)
+	if err != nil {
+		return err
+	}
+
+	for key, id := range d.dict {
+		offset := 0
+		raw := make([]byte, idSize16+len(key)+1)
+
+		binary.BigEndian.PutUint16(raw[offset:], id)
+		offset += idSize16
+
+		for i, c := range key {
+			raw[offset+i] = byte(c)
+		}
+		offset += len(key)
+
+		raw[offset] = byteRS
+		offset += 1
+
+		_, err = fh.Write(raw)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
