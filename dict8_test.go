@@ -1,12 +1,13 @@
-package dict
+package dict_test
 
 import (
+	"github.com/zofan/go-dict"
 	"os"
 	"testing"
 )
 
 func Test8(t *testing.T) {
-	d := New8()
+	d := dict.New8()
 
 	id1 := d.GetID(`hello world!`)
 	if id1 == 0 {
@@ -28,10 +29,10 @@ func Test8(t *testing.T) {
 		t.Error(`expected key1 equal "hello world!"`)
 	}
 
-	raw, _ := d.MarshalBinary()
+	_ = d.SaveFile(`./Dict8.csv`)
 
-	d2 := New8()
-	_ = d2.UnmarshalBinary(raw)
+	d2 := dict.New8()
+	_ = d2.LoadFile(`./Dict8.csv`)
 
 	id5 := d2.GetID(`good bye!`)
 	if id5 != id3 {
