@@ -164,7 +164,7 @@ func (d *Dict32) LoadFile(file string) error {
 		}
 		idRaw, key := line[:i], line[i+1:]
 
-		id, err := strconv.ParseInt(idRaw, 10, idSize32*8)
+		id, err := strconv.ParseUint(idRaw, 10, idSize32*8)
 		if err != nil {
 			continue
 		}
@@ -191,7 +191,7 @@ func (d *Dict32) SaveFile(file string) error {
 	defer d.mu.RUnlock()
 
 	for k, id := range d.dict {
-		if _, err = fh.WriteString(strconv.Itoa(int(id)) + `;` + k + "\n"); err != nil {
+		if _, err = fh.WriteString(strconv.FormatUint(uint64(id), 10) + `;` + k + "\n"); err != nil {
 			return err
 		}
 	}
